@@ -191,3 +191,20 @@ export function hasDuplicateDecision(log: DecisionLog, decision: string): boolea
     (e) => e.decision.trim() === target && e.status !== 'superseded' && e.status !== 'rejected',
   )
 }
+
+/**
+ * 文件来源校验（防 AI 幻觉引用）：给定候选文件列表和真实存在集合，
+ * 返回 { kept, dropped }——存在的保留，不存在的丢弃（学 OpenViking repairDigestUris 防幻觉）。
+ * 纯逻辑，不碰 fs，便于单测。
+ */
+export function validateFiles(files: string[], existing: Set<string>): { kept: string[]; dropped: string[] } {
+  const kept: string[] = []
+  const dropped: string[] = []
+  for (const f of files) {
+    const path = String(f ?? '').trim()
+    if (!path) continue
+    if (existing.has(path)) kept.push(path)
+    else dropped.push(path)
+  }
+  return { kept, dropped }
+}

@@ -21,7 +21,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
-import { appendEntry, emptyLog, hasDuplicateDecision, parseLog, queryLog, renderSummary, serializeLog, updateStatusByDecision, type DecisionEntry, type DecisionLog } from './lib/store.js'
+import { appendEntry, emptyLog, hasDuplicateDecision, parseLog, queryLog, renderSummary, serializeLog, updateStatusByDecision, validateFiles, type DecisionEntry, type DecisionLog } from './lib/store.js'
 import { extractCandidate, type DecisionCandidate } from './lib/candidate.js'
 import { auditLog } from './lib/audit.js'
 
@@ -200,6 +200,25 @@ export async function apply(ctx: Context): Promise<void> {
         }
         const seq = (exec as { agent?: { session?: { seq?: number } } })?.agent?.session?.seq
         const sessionId = (exec as { agent?: { session?: { id?: string } } })?.agent?.session?.id ?? 'unknown'
+        // 文件来源校验（防 AI 幻觉引用）：只在文件真实存在时保留
+        const rawFiles = Array.isArray(args.files) ? args.files.map(String) : []
+        let droppedFiles: string[] = []
+        if (rawFiles.length > 0) {
+          try {
+            const { existsSync } = await import('node:fs')
+            const { resolve } = await import('node:path')
+            const existing = new Set<string>()
+            for (const f of rawFiles) {
+              try {
+                const abs = resolve(cwd, f)
+                if (existsSync(abs)) existing.add(f)
+              } catch { /* 忽略单条校验失败 */ }
+            }
+            const v = validateFiles(rawFiles, existing)
+            droppedFiles = v.dropped
+            if (v.kept.length > 0) rawFiles.splice(0, rawFiles.length, ...v.kept)
+          } catch { /* 校验失败则保留原始 files（fail-open） */ }
+        }
         const entry: DecisionEntry = {
           time: new Date().toISOString(),
           decision,
@@ -208,12 +227,12 @@ export async function apply(ctx: Context): Promise<void> {
           reason: typeof args.reason === 'string' ? args.reason : undefined,
           // 审批门：AI 记录默认 pending（待用户确认），用户手动指定 accepted/rejected 除外
           status: (['accepted', 'superseded', 'rejected'].includes(String(args.status)) ? String(args.status) : 'pending') as DecisionEntry['status'],
-          files: Array.isArray(args.files) ? args.files.map(String) : undefined,
+          files: rawFiles.length > 0 ? rawFiles : undefined,
           source: { sessionId, seq },
         }
         const next = appendEntry(log, entry)
         const path = await saveLog(ctx, cwd, next, signal)
-        return {
+        const result: Record<string, unknown> = {
           ok: true,
           path,
           count: next.entries.length,
@@ -222,6 +241,11 @@ export async function apply(ctx: Context): Promise<void> {
           // 提示 AI/用户确认流程
           hint: entry.status === 'pending' ? '该决策已记为"待确认"。请向用户展示，用户确认后调用 decision_confirm，拒绝则调用 decision_reject。' : undefined,
         }
+        if (droppedFiles.length > 0) {
+          result.droppedFiles = droppedFiles
+          result.warning = `以下文件不存在，已从决策中移除：${droppedFiles.join(', ')}`
+        }
+        return result
       },
     }))
   } catch (err) {
