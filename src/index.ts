@@ -21,7 +21,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
-import { appendEntry, emptyLog, parseLog, queryLog, renderSummary, serializeLog, updateStatusByDecision, type DecisionEntry, type DecisionLog } from './lib/store.js'
+import { appendEntry, emptyLog, hasDuplicateDecision, parseLog, queryLog, renderSummary, serializeLog, updateStatusByDecision, type DecisionEntry, type DecisionLog } from './lib/store.js'
 import { auditLog } from './lib/audit.js'
 
 export const name = 'dsh-decision-log'
@@ -160,6 +160,15 @@ export async function apply(ctx: Context): Promise<void> {
         const cwd = cwdOf(exec as { agent?: { session?: { header?: { cwd?: string } } } })
         const signal = (exec as { signal?: AbortSignal })?.signal
         const log = await loadLog(ctx, cwd, signal)
+        // 防自污染：已有完全相同的有效决策时拒绝重复记录（排除已推翻/已拒绝的）
+        if (hasDuplicateDecision(log, decision)) {
+          return {
+            ok: false,
+            duplicated: true,
+            error: `决策已存在:「${decision}」。请勿重复记录；如需改变主意，调用 decision_log 并传 status: superseded 标注旧决策已推翻。`,
+            hint: '用 decision_list 查看已有决策；确属新决定才记录。',
+          }
+        }
         const seq = (exec as { agent?: { session?: { seq?: number } } })?.agent?.session?.seq
         const sessionId = (exec as { agent?: { session?: { id?: string } } })?.agent?.session?.id ?? 'unknown'
         const entry: DecisionEntry = {

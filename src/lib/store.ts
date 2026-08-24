@@ -182,3 +182,12 @@ export function updateStatusByDecision(log: DecisionLog, decision: string, statu
   entries[idx] = entry
   return { log: { entries }, found: true }
 }
+
+/** 是否已存在完全相同的决策（排除已推翻/已拒绝的旧条目）；用于防自污染去重 */
+export function hasDuplicateDecision(log: DecisionLog, decision: string): boolean {
+  const target = decision.trim()
+  if (!target) return false
+  return log.entries.some(
+    (e) => e.decision.trim() === target && e.status !== 'superseded' && e.status !== 'rejected',
+  )
+}
