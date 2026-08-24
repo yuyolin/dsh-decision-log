@@ -13,6 +13,8 @@ export interface AuditResult {
   accepted: number
   superseded: number
   rejected: number
+  /** 最老待确认条目的年龄（天），无 pending 时为 null */
+  oldestPendingAgeDays: number | null
   duplicates: Array<{ index: number; decision: string; of: number; reason: string }>
   tokenEstimate: number
   note: string
@@ -59,16 +61,30 @@ export function auditLog(log: DecisionLog, opts: { similarityThreshold?: number 
   const cjkLen = allText.length - asciiLen
   const tokenEstimate = Math.ceil(asciiLen / 4 + cjkLen / 1.5)
 
+  // 最老待确认条目的年龄（天）；无 pending 为 null
+  const now = Date.now()
+  let oldestPendingAgeDays: number | null = null
+  for (const e of entries) {
+    if (e.status !== 'pending') continue
+    const t = Date.parse(e.time)
+    if (Number.isNaN(t)) continue
+    const ageDays = Math.floor((now - t) / 86400000)
+    if (oldestPendingAgeDays === null || ageDays > oldestPendingAgeDays) oldestPendingAgeDays = ageDays
+  }
+  const stalePending = oldestPendingAgeDays !== null && oldestPendingAgeDays >= 7
+
   return {
     total: entries.length,
     pending,
     accepted,
     superseded,
     rejected,
+    oldestPendingAgeDays,
     duplicates: duplicates.slice(0, 20),
     tokenEstimate,
     note: [
       pending > 0 ? `${pending} 条待确认，用 decision_confirm / decision_reject 处理` : '',
+      stalePending ? `最老的待确认已 ${oldestPendingAgeDays} 天，建议尽快处理` : '',
       duplicates.length ? `发现 ${duplicates.length} 组疑似重复` : '',
     ].filter(Boolean).join('；') || '无重复记录',
   }
