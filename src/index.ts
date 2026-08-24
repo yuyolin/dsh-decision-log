@@ -83,10 +83,25 @@ async function buildInjectionMessage(ctx: Context, text: string): Promise<unknow
   })
 }
 
-/** 读取决策摘要（含首次自动建空白文件）；无内容返回 '' */
+/** summary 缓存：cwd -> { mtimeMs, summary }，文件未变时不重读盘（省 I/O） */
+const summaryCache = new Map<string, { mtimeMs: number; summary: string }>()
+
+/** 读取决策摘要（含 mtime 缓存，文件未变时不重读盘）；无内容返回 '' */
 async function summaryFor(ctx: Context, cwd: string, signal?: AbortSignal): Promise<string> {
+  const file = `${cwd}/${DECISIONS_FILE}`
+  let mtimeMs = 0
+  try {
+    const { statSync } = await import('node:fs')
+    mtimeMs = statSync(file).mtimeMs
+  } catch {
+    /* 文件不存在 → mtime 0 */
+  }
+  const cached = summaryCache.get(cwd)
+  if (cached && cached.mtimeMs === mtimeMs) return cached.summary
   const log = await loadLog(ctx, cwd, signal)
-  return renderSummary(log, INJECT_MAX_CHARS)
+  const summary = renderSummary(log, INJECT_MAX_CHARS)
+  summaryCache.set(cwd, { mtimeMs, summary })
+  return summary
 }
 
 /** 确保工作区已初始化空白 DECISIONS.md（只建一次） */
