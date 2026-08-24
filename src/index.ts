@@ -374,31 +374,35 @@ export async function apply(ctx: Context): Promise<void> {
         description: '手动记录一条决策（命令平面，不占模型 token）',
         usage: '/log-decision <决策内容> [--context 背景] [--reason 理由]',
         handler: async (args: unknown) => {
-          const a = (args ?? {}) as Record<string, unknown>
-          const text = typeof a.text === 'string' ? a.text : String(a.arguments ?? '')
-          if (!text.trim()) return '用法:/log-decision <决策内容> [--context 背景] [--reason 理由]'
-          // 解析 --key value 或 --key=value
-          const m = text.match(/(--\w+\s+[^--]+|--\w+=\S+)/g) ?? []
-          let decision = text
-          const fields: Record<string, string> = {}
-          for (const part of m) {
-            const kv = part.startsWith('--') ? part.slice(2) : part
-            const [k, ...rest] = kv.split(/[= ]/)
-            fields[k] = rest.join(' ').trim() || 'true'
-            decision = decision.replace(part, '')
+          try {
+            const a = (args ?? {}) as Record<string, unknown>
+            const text = typeof a.text === 'string' ? a.text : String(a.arguments ?? '')
+            if (!text.trim()) return { kind: 'error', text: '用法:/log-decision <决策内容> [--context 背景] [--reason 理由]' }
+            // 解析 --key value 或 --key=value
+            const m = text.match(/(--\w+\s+[^--]+|--\w+=\S+)/g) ?? []
+            let decision = text
+            const fields: Record<string, string> = {}
+            for (const part of m) {
+              const kv = part.startsWith('--') ? part.slice(2) : part
+              const [k, ...rest] = kv.split(/[= ]/)
+              fields[k] = rest.join(' ').trim() || 'true'
+              decision = decision.replace(part, '')
+            }
+            const cwd = process.env.DSH_WORKSPACE ?? process.cwd()
+            const log = await loadLog(ctx, cwd)
+            const entry: DecisionEntry = {
+              time: new Date().toISOString(),
+              decision: decision.trim(),
+              context: fields.context,
+              reason: fields.reason,
+              status: 'accepted',
+            }
+            const next = appendEntry(log, entry)
+            const path = await saveLog(ctx, cwd, next)
+            return { kind: 'success', text: `决策已记录:${path}（共 ${next.entries.length} 条）` }
+          } catch (err) {
+            return { kind: 'error', text: `记录失败:${(err as Error).message}` }
           }
-          const cwd = process.env.DSH_WORKSPACE ?? process.cwd()
-          const log = await loadLog(ctx, cwd)
-          const entry: DecisionEntry = {
-            time: new Date().toISOString(),
-            decision: decision.trim(),
-            context: fields.context,
-            reason: fields.reason,
-            status: 'accepted',
-          }
-          const next = appendEntry(log, entry)
-          const path = await saveLog(ctx, cwd, next)
-          return `决策已记录:${path}（共 ${next.entries.length} 条）`
         },
       })
     }
