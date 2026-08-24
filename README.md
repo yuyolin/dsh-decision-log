@@ -359,6 +359,25 @@ npm test          # node --test（store/extractor/audit 纯逻辑测试）
 
 > **本子可以越记越厚，但 AI 每轮只看固定的一页。** 该花的一分不多花，不该花的一分不少省。放心用，越用越值！
 
+## 👋 关于作者
+
+这个插件是我（**yuyolin**）做的，一个 DeepSeek Harness 生态的忠实玩家和折腾爱好者。
+
+我特别喜欢研究 dsh 这种"一切皆插件"的玩法，也一直在琢磨：**怎么让 AI 干活越来越省心、越来越懂你**。dsh-decision-log 就是其中一个答案——把"决定"变成项目的资产，而不是聊完就丢的对话。
+
+在 dsh 生态里我还折腾过这些（欢迎去看看）：
+
+- **dsh-decision-log**（就是这个）：决策日志，让 AI 记住"当初为啥这么干"
+- **dsh-task-bootstrap**（拖即续）：把干到一半的任务打包带走，换个对话接着干
+- **dsh-drag-handoff**：把任务卡拖进新对话，fork 出一段新上下文
+
+如果你也喜欢 dsh、有想法想聊聊、或者用这个插件遇到问题，都欢迎找我：
+
+- 📮 **邮箱**：**yuyolin9@gmail.com**
+- 🐙 **GitHub**：[yuyolin](https://github.com/yuyolin)
+
+我会认真看每一条反馈——你觉得哪里不好用、想加什么功能、甚至想一起做个新插件，都直接说！**好插件是聊出来的。**
+
 ## 📄 License
 
 MIT — 自由使用，欢迎提 PR、提 issue、点 star ⭐
