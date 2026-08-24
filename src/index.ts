@@ -11,7 +11,7 @@
  *   - 工具 decision_export:导出 DECISIONS.md
  *   - 命令 /log-decision  :命令平面记决策（不占模型 token）
  *   - 钩子 agent/pre-step :自动注入决策摘要（防重复讨论）
- *   - 钩子 session/event  :启发式识别决策候选（记录候选，不自动落盘）
+ *   - 钩子 systemPrompt   :教模型在方案选择时主动记决策
  *
  * 设计约束：
  *   - 走官方 API（exec.agent.session、ctx.fs、ctx.on），不解析内部日志文件
@@ -22,7 +22,6 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { appendEntry, emptyLog, parseLog, queryLog, renderSummary, serializeLog, type DecisionEntry, type DecisionLog } from './lib/store.js'
-import { extractCandidate } from './lib/extractor.js'
 import { auditLog } from './lib/audit.js'
 
 export const name = 'dsh-decision-log'
@@ -295,16 +294,21 @@ export async function apply(ctx: Context): Promise<void> {
     log('warn', `注册 agent/pre-step 注入失败:${(err as Error).message}`)
   }
 
-  // ---------- 钩子:session/event 启发式识别候选（记录日志，不自动落盘） ----------
+  // ---------- systemPrompt 引导:教模型在方案选择时主动记决策 ----------
   try {
-    ;(ctx as any).on?.('session/event', (session: { id: string }, event: unknown) => {
-      const candidate = extractCandidate(session?.id ?? 'unknown', event)
-      if (candidate) {
-        console.log(`[decision-log] 决策候选 ${candidate.kind}:${candidate.text.slice(0, 80)}（如需记录请调用 decision_log 确认）`)
-      }
-    })
-  } catch {
-    /* 事件名未知则静默 */
+    const systemPrompt = (ctx as any).get?.('systemPrompt') ?? (ctx as any).systemPrompt as
+      | { section?: (def: Record<string, unknown>) => unknown }
+      | undefined
+    if (systemPrompt && typeof systemPrompt.section === 'function') {
+      ;(ctx as any).effect?.(() => systemPrompt.section({
+        name: 'decision-log:instructions',
+        order: 200,
+        text:
+          '当你在多个方案之间做出选择、更换技术选型、或改变实现方向时，调用 decision_log 工具记录这条决策（选了什么 + 为什么）。重要决策不要只留在对话里，要落盘到 .dsh/DECISIONS.md 供后续会话复用。',
+      }), 'decision-log.section()')
+    }
+  } catch (err) {
+    log('warn', `注册 systemPrompt 引导失败:${(err as Error).message}`)
   }
 
   log('info', 'plugin ready: decision_log / decision_list / decision_audit / decision_export')
