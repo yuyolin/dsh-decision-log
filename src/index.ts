@@ -21,7 +21,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
-import { appendEntry, emptyLog, parseLog, queryLog, renderSummary, serializeLog, type DecisionEntry, type DecisionLog } from './lib/store.js'
+import { appendEntry, emptyLog, parseLog, queryLog, renderSummary, serializeLog, updateStatusByDecision, type DecisionEntry, type DecisionLog } from './lib/store.js'
 import { auditLog } from './lib/audit.js'
 
 export const name = 'dsh-decision-log'
@@ -153,27 +153,68 @@ export async function apply(ctx: Context): Promise<void> {
           context: typeof args.context === 'string' ? args.context : undefined,
           alternatives: Array.isArray(args.alternatives) ? args.alternatives.map(String) : undefined,
           reason: typeof args.reason === 'string' ? args.reason : undefined,
-          status: (['accepted', 'superseded', 'rejected'].includes(String(args.status)) ? String(args.status) : 'accepted') as DecisionEntry['status'],
+          // 审批门：AI 记录默认 pending（待用户确认），用户手动指定 accepted/rejected 除外
+          status: (['accepted', 'superseded', 'rejected'].includes(String(args.status)) ? String(args.status) : 'pending') as DecisionEntry['status'],
           files: Array.isArray(args.files) ? args.files.map(String) : undefined,
           source: { sessionId, seq },
         }
         const next = appendEntry(log, entry)
         const path = await saveLog(ctx, cwd, next, signal)
-        return { ok: true, path, count: next.entries.length, entry }
+        return {
+          ok: true,
+          path,
+          count: next.entries.length,
+          entry,
+          pending: entry.status === 'pending',
+          // 提示 AI/用户确认流程
+          hint: entry.status === 'pending' ? '该决策已记为"待确认"。请向用户展示，用户确认后调用 decision_confirm，拒绝则调用 decision_reject。' : undefined,
+        }
       },
     }))
   } catch (err) {
     log('warn', `注册 decision_log 失败:${(err as Error).message}`)
   }
 
-  // ---------- 工具 2:decision_list ----------
+  // ---------- 工具 3:decision_confirm / decision_reject（审批门） ----------
+  const registerDecisionVerdict = (toolName: string, status: 'accepted' | 'rejected', verb: string) => {
+    try {
+      tools.register((defineTool as unknown as AnyFn)({
+        name: toolName,
+        description: `将一条"待确认"的决策标记为 ${verb}。用 decision_list 或决策摘要找到那条待确认决策，传入其决策内容。`,
+        parameters: {
+          decision: { type: 'string', required: true, description: '要确认/拒绝的决策内容（与记录时一致）' },
+        },
+        output: {
+          schema: { type: 'object', additionalProperties: true },
+          render: (_a: unknown, v: unknown) => [{ type: 'text', text: typeof v === 'string' ? v : JSON.stringify(v, null, 2) }],
+        },
+        async execute(args: Record<string, unknown>, exec: unknown) {
+          const decision = String(args.decision ?? '').trim()
+          if (!decision) throw new Error(`${toolName}: decision 必填`)
+          const cwd = cwdOf(exec as { agent?: { session?: { header?: { cwd?: string } } } })
+          const signal = (exec as { signal?: AbortSignal })?.signal
+          const log = await loadLog(ctx, cwd, signal)
+          const r = updateStatusByDecision(log, decision, status)
+          if (!r.found) return { ok: false, error: `未找到决策:「${decision}」`, hint: '先调用 decision_list 确认准确的决策内容' }
+          await saveLog(ctx, cwd, r.log, signal)
+          return { ok: true, decision, status, count: r.log.entries.length }
+        },
+      }))
+    } catch (err) {
+      log('warn', `注册 ${toolName} 失败:${(err as Error).message}`)
+    }
+  }
+  registerDecisionVerdict('decision_confirm', 'accepted', '已确认')
+  registerDecisionVerdict('decision_reject', 'rejected', '已拒绝')
+
+  // ---------- 工具 3:decision_audit ----------
   try {
     tools.register((defineTool as unknown as AnyFn)({
       name: 'decision_list',
       description: '查询工作区已记录的决策。关键词/状态过滤，最新在前。',
       parameters: {
         keyword: { type: 'string', description: '关键词过滤（可选）' },
-        status: { type: 'string', enum: ['accepted', 'superseded', 'rejected'], description: '状态过滤（可选）' },
+        status: { type: 'string', enum: ['pending', 'accepted', 'superseded', 'rejected'], description: '状态过滤（可选）' },
         limit: { type: 'number', description: '返回条数，默认 20，最大 200' },
       },
       output: {
@@ -198,7 +239,7 @@ export async function apply(ctx: Context): Promise<void> {
     log('warn', `注册 decision_list 失败:${(err as Error).message}`)
   }
 
-  // ---------- 工具 3:decision_audit ----------
+  // ---------- 工具 4:decision_audit ----------
   try {
     tools.register((defineTool as unknown as AnyFn)({
       name: 'decision_audit',
@@ -221,7 +262,7 @@ export async function apply(ctx: Context): Promise<void> {
     log('warn', `注册 decision_audit 失败:${(err as Error).message}`)
   }
 
-  // ---------- 工具 4:decision_export ----------
+  // ---------- 工具 5:decision_export ----------
   try {
     tools.register((defineTool as unknown as AnyFn)({
       name: 'decision_export',
@@ -352,7 +393,7 @@ export async function apply(ctx: Context): Promise<void> {
         name: 'decision-log:instructions',
         order: 200,
         text:
-          '当你在多个方案之间做出选择、更换技术选型、或改变实现方向时，调用 decision_log 工具记录这条决策（选了什么 + 为什么）。重要决策不要只留在对话里，要落盘到 .dsh/DECISIONS.md 供后续会话复用。',
+          '当你在多个方案之间做出选择、更换技术选型、或改变实现方向时，调用 decision_log 工具记录这条决策（选了什么 + 为什么）。记录后它会以"待确认"状态落盘，请把决策内容展示给用户，用户确认后调用 decision_confirm、拒绝则调用 decision_reject。重要决策不要只留在对话里，要落盘到 .dsh/DECISIONS.md 供后续会话复用。',
       }), 'decision-log.section()')
     }
   } catch (err) {

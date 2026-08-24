@@ -9,6 +9,7 @@ import type { DecisionEntry, DecisionLog } from './store.js'
 
 export interface AuditResult {
   total: number
+  pending: number
   accepted: number
   superseded: number
   rejected: number
@@ -32,6 +33,7 @@ function similarity(a: string, b: string): number {
 export function auditLog(log: DecisionLog, opts: { similarityThreshold?: number } = {}): AuditResult {
   const threshold = opts.similarityThreshold ?? 0.7
   const entries = log.entries
+  const pending = entries.filter((e) => e.status === 'pending').length
   const accepted = entries.filter((e) => e.status === 'accepted').length
   const superseded = entries.filter((e) => e.status === 'superseded').length
   const rejected = entries.filter((e) => e.status === 'rejected').length
@@ -59,13 +61,15 @@ export function auditLog(log: DecisionLog, opts: { similarityThreshold?: number 
 
   return {
     total: entries.length,
+    pending,
     accepted,
     superseded,
     rejected,
     duplicates: duplicates.slice(0, 20),
     tokenEstimate,
-    note: duplicates.length
-      ? `发现 ${duplicates.length} 组疑似重复，建议用 decision_log 标记 superseded 或用 decision_export 手工整理`
-      : '无重复记录',
+    note: [
+      pending > 0 ? `${pending} 条待确认，用 decision_confirm / decision_reject 处理` : '',
+      duplicates.length ? `发现 ${duplicates.length} 组疑似重复` : '',
+    ].filter(Boolean).join('；') || '无重复记录',
   }
 }

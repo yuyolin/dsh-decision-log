@@ -21,7 +21,7 @@
 export interface DecisionEntry {
   time: string          // ISO 时间戳
   decision: string      // 决策内容（标题行）
-  status: 'accepted' | 'superseded' | 'rejected'
+  status: 'pending' | 'accepted' | 'superseded' | 'rejected'
   context?: string      // 背景
   alternatives?: string[] // 备选方案
   reason?: string       // 理由
@@ -70,7 +70,10 @@ export function parseLog(text: string): DecisionLog {
       if (field !== null) {
         const key = field[1].trim()
         const value = field[2].trim()
-        if (key === '状态' || key === 'status') current.status = (value === 'superseded' || value === 'rejected' ? value : 'accepted') as DecisionEntry['status']
+        if (key === '状态' || key === 'status') {
+          const v = (value === 'superseded' || value === 'rejected' || value === 'pending' ? value : 'accepted') as DecisionEntry['status']
+          current.status = v
+        }
         else if (key === '上下文' || key === 'context') current.context = value
         else if (key === '备选' || key === 'alternatives') current.alternatives = parseList(value)
         else if (key === '理由' || key === 'reason') current.reason = value
@@ -154,14 +157,28 @@ export function renderSummary(log: DecisionLog, maxChars = 2000): string {
   const list = [...log.entries].reverse()
   const blocks: string[] = []
   let total = 0
+  const statusLabel: Record<string, string> = { pending: '待确认', accepted: 'accepted', superseded: 'superseded', rejected: 'rejected' }
   for (const e of list) {
-    const block = `- [${e.status}] ${e.decision}` + (e.reason ? ` — ${e.reason}` : '')
+    const block = `- [${statusLabel[e.status] ?? e.status}] ${e.decision}` + (e.reason ? ` — ${e.reason}` : '')
     if (total + block.length + 1 > maxChars) break
     blocks.push(block)
     total += block.length + 1
   }
   if (blocks.length === 0) return ''
   const omitted = log.entries.length - blocks.length
-  const head = `已有 ${log.entries.length} 条决策记录（勿重复讨论，如需推翻请先说明理由）：`
+  const pendingCount = log.entries.filter((e) => e.status === 'pending').length
+  const head = `已有 ${log.entries.length} 条决策记录${pendingCount > 0 ? `（其中 ${pendingCount} 条待确认，请说'确认'或'拒绝'）` : '（勿重复讨论，如需推翻请先说明理由）'}：`
   return head + '\n' + blocks.join('\n') + (omitted > 0 ? `\n(... 其余 ${omitted} 条见 .dsh/DECISIONS.md)` : '')
+}
+
+/** 按决策标题精确匹配，更新状态；返回是否找到并更新（用于 decision_confirm / decision_reject） */
+export function updateStatusByDecision(log: DecisionLog, decision: string, status: DecisionEntry['status']): { log: DecisionLog; found: boolean } {
+  const target = decision.trim()
+  if (!target) return { log, found: false }
+  const idx = log.entries.findIndex((e) => e.decision.trim() === target)
+  if (idx === -1) return { log, found: false }
+  const entry = { ...log.entries[idx], status }
+  const entries = [...log.entries]
+  entries[idx] = entry
+  return { log: { entries }, found: true }
 }
