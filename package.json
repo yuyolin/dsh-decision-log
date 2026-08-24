@@ -40,6 +40,7 @@
   ],
   "devDependencies": {
     "@deepseek-ai/cordis": "link:C:/Users/lyy20/Documents/deepseek-harness/vendor/cordis",
+    "@deepseek-ai/dsh-llm": "link:C:/Users/lyy20/Documents/deepseek-harness/packages/llm/llm",
     "@deepseek-ai/dsh-tools": "link:C:/Users/lyy20/Documents/deepseek-harness/packages/core/tools",
     "@types/node": "^26.2.0",
     "esbuild": "^0.24.0",

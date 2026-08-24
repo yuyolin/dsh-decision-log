@@ -11,6 +11,9 @@ importers:
       '@deepseek-ai/cordis':
         specifier: link:C:/Users/lyy20/Documents/deepseek-harness/vendor/cordis
         version: link:C:/Users/lyy20/Documents/deepseek-harness/vendor/cordis
+      '@deepseek-ai/dsh-llm':
+        specifier: link:C:/Users/lyy20/Documents/deepseek-harness/packages/llm/llm
+        version: link:C:/Users/lyy20/Documents/deepseek-harness/packages/llm/llm
       '@deepseek-ai/dsh-tools':
         specifier: link:C:/Users/lyy20/Documents/deepseek-harness/packages/core/tools
         version: link:C:/Users/lyy20/Documents/deepseek-harness/packages/core/tools

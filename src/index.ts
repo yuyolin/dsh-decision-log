@@ -275,10 +275,11 @@ export async function apply(ctx: Context): Promise<void> {
       const last = lastInjected.get(agent as object)
       if (step !== 1 && last === summary) return decision
       lastInjected.set(agent as object, summary)
+      // 用官方 createUserMessage 构造注入消息：生成稳定 id、归一化、对齐未来消息不变量
+      const { createUserMessage } = await import('@deepseek-ai/dsh-llm')
       return {
         kind: 'enter',
-        messages: decision.messages.concat([{
-          role: 'user',
+        messages: decision.messages.concat([createUserMessage({
           content: [{ type: 'text', text: summary }],
           // 官方插件标记：声明这是插件注入的上下文快照，而非真实用户消息
           source: {
@@ -287,7 +288,7 @@ export async function apply(ctx: Context): Promise<void> {
             form: 'snapshot',
             sections: [{ name: 'decision-log:summary', text: summary }],
           },
-        }]),
+        })]),
       }
     }, { prepend: true })
   } catch (err) {
