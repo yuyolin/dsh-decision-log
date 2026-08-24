@@ -408,8 +408,9 @@ export async function apply(ctx: Context): Promise<void> {
         name: 'decision-log:instructions',
         order: 200,
         text:
-          '【决策日志】当你在多个方案之间做出选择、更换技术选型、或改变实现方向时，调用 decision_log 工具记录这条决策（选了什么 + 为什么）。记录后它会以"待确认"状态落盘，请把决策内容展示给用户，用户确认后调用 decision_confirm、拒绝则调用 decision_reject。重要决策不要只留在对话里，要落盘到 .dsh/DECISIONS.md 供后续会话复用。\n' +
-          '【可见归属】当你依据 DECISIONS.md 中的决策记录回答问题时，请用引用块标注来源，格式：> 📌 依据 .dsh/DECISIONS.md（决策名）。拿不准是否相关时也要标注——让用户看到决策记忆在被使用，比隐藏价值更好。',
+          '【决策日志】调用 decision_log 工具记录决策（选了什么 + 为什么），时机：① 用户批准方案后、开始写代码前 ② 技术选型/方向变更时 ③ 推翻旧决策时。记录后以"待确认"状态落盘，请把决策内容展示给用户，用户确认后调用 decision_confirm、拒绝则调用 decision_reject。重要决策不要只留在对话里，要落盘到 .dsh/DECISIONS.md 供后续会话复用。\n' +
+          '【可见归属】当你依据 DECISIONS.md 中的决策记录回答问题时，请用引用块标注来源，格式：> 📌 依据 .dsh/DECISIONS.md（决策名）。拿不准是否相关时也要标注——让用户看到决策记忆在被使用，比隐藏价值更好。\n' +
+          '【防自污染】不要因为用户复述了注入的决策摘要就重复记录；除非用户明确说"新决定/改主意"，否则不调用 decision_log。',
       }), 'decision-log.section()')
     }
   } catch (err) {
