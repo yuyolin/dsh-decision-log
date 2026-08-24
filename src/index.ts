@@ -250,6 +250,8 @@ export async function apply(ctx: Context): Promise<void> {
   // ---------- 钩子:agent/pre-step 自动注入决策摘要 ----------
   try {
     const lastInjected = new WeakMap<object, string>()
+    // 记录已初始化过空白文件的 cwd，避免每次 pre-step 都检查磁盘
+    const ensuredCwd = new Set<string>()
     ;(ctx as any).on?.('agent/pre-step', async ({ agent, step, signal }: { agent: { session?: { header?: { cwd?: string } } }; step: number; signal: AbortSignal }, next: AnyFn) => {
       const decision = await next()
       if (decision?.kind === 'reject' || signal?.aborted) return decision
@@ -257,6 +259,14 @@ export async function apply(ctx: Context): Promise<void> {
       if (!cwd) return decision
       let summary: string
       try {
+        // 首次遇到该工作区：确保空白 DECISIONS.md 已创建（给 AI 读的"小本本"）
+        if (!ensuredCwd.has(cwd)) {
+          ensuredCwd.add(cwd)
+          const log0 = await loadLog(ctx, cwd, signal)
+          if (log0.entries.length === 0) {
+            await saveLog(ctx, cwd, log0, signal)
+          }
+        }
         const log = await loadLog(ctx, cwd, signal)
         summary = renderSummary(log, INJECT_MAX_CHARS)
       } catch {
