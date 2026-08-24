@@ -23,6 +23,7 @@
     "dsh.plugin.json",
     "skills",
     "README.md",
+    "README.en.md",
     "LICENSE"
   ],
   "scripts": {
