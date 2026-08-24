@@ -22,6 +22,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { appendEntry, emptyLog, hasDuplicateDecision, parseLog, queryLog, renderSummary, serializeLog, updateStatusByDecision, type DecisionEntry, type DecisionLog } from './lib/store.js'
+import { extractCandidate, type DecisionCandidate } from './lib/candidate.js'
 import { auditLog } from './lib/audit.js'
 
 export const name = 'dsh-decision-log'
@@ -108,6 +109,34 @@ async function summaryFor(ctx: Context, cwd: string, signal?: AbortSignal): Prom
 async function ensureLogFile(ctx: Context, cwd: string, signal?: AbortSignal): Promise<void> {
   const log = await loadLog(ctx, cwd, signal)
   if (log.entries.length === 0) await saveLog(ctx, cwd, log, signal)
+}
+
+// ---------- 决策候选队列（自动识别的"潜在决策"，不落盘，等用户/AI 确认） ----------
+/** 候选队列：cwd -> 未提示过的候选列表 */
+const candidateQueue = new Map<string, DecisionCandidate[]>()
+/** 已提示过的候选指纹（防重复提示） */
+const promptedCandidates = new Set<string>()
+
+function candidateFingerprint(c: DecisionCandidate): string {
+  return `${c.sessionId}:${c.seq ?? ''}:${c.text.slice(0, 40)}`
+}
+
+/** 入队候选（带 dedup）；返回入队数 */
+function enqueueCandidate(cwd: string, c: DecisionCandidate): number {
+  const fp = candidateFingerprint(c)
+  if (promptedCandidates.has(fp)) return 0
+  promptedCandidates.add(fp)
+  const list = candidateQueue.get(cwd) ?? []
+  list.push(c)
+  candidateQueue.set(cwd, list)
+  return 1
+}
+
+/** 取走某工作区的全部候选（提示后清空） */
+function drainCandidates(cwd: string): DecisionCandidate[] {
+  const list = candidateQueue.get(cwd) ?? []
+  candidateQueue.delete(cwd)
+  return list
 }
 
 export async function apply(ctx: Context): Promise<void> {
@@ -351,6 +380,18 @@ export async function apply(ctx: Context): Promise<void> {
     }
   } catch (err) {
     log('warn', `注册 /log-decision 失败:${(err as Error).message}`)
+  }
+
+  // ---------- 钩子:session/event 自动识别决策候选（入队不落盘，提示由 pre-step 做） ----------
+  try {
+    ;(ctx as any).on?.('session/event', (session: { id?: string; header?: { cwd?: string } }, event: unknown) => {
+      const cwd = session?.header?.cwd
+      if (!cwd) return
+      const candidate = extractCandidate(session.id ?? 'unknown', event)
+      if (candidate) enqueueCandidate(cwd, candidate)
+    })
+  } catch (err) {
+    log('warn', `注册 session/event 候选识别失败:${(err as Error).message}`)
   }
 
   // ---------- 钩子:agent/pre-step 自动注入决策摘要 ----------
