@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="440" viewBox="0 0 1200 440" role="img" aria-labelledby="title desc">
   <title id="title">dsh-decision-log 决策闭环</title>
-  <desc id="desc">从拍板到记忆的自动闭环:你说一句「记一下」→ decision_log 落盘 → 写入 .dsh/DECISIONS.md → 每轮新对话自动注入摘要 → AI 带着记忆干活。</desc>
+  <desc id="desc">从拍板到记忆的自动闭环:你说一句「记一下」→ decision_log 落盘 → 写入 .dsh/DECISIONS.md(手账纸)→ 每轮新对话自动注入摘要 → AI 带着记忆干活。</desc>
 
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
@@ -11,8 +11,8 @@
   <rect width="1200" height="440" rx="24" fill="#0F1020"/>
 
   <!-- 标题区 -->
-  <g transform="translate(46 30)">
-    <text x="0" y="26" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif" font-size="26" font-weight="800" fill="#F2F3FA">从拍板到记忆:一套自动闭环</text>
+  <g transform="translate(46 16)">
+    <text x="0" y="24" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif" font-size="26" font-weight="900" fill="#F4F5FA">从拍板到记忆:一套自动闭环</text>
     <text x="0" y="52" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif" font-size="15" fill="#9AA0BF">记一笔 2 秒,换来每轮对话都记得——全程无需你手动喂上下文</text>
   </g>
 
@@ -24,7 +24,7 @@
     <text x="98" y="80" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif" font-size="20" font-weight="700" fill="#F2F3FA">你拍板</text>
     <text x="98" y="104" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12" fill="#6E7291">说人话就够</text>
     <line x1="16" y1="120" x2="180" y2="120" stroke="#262A45"/>
-    <text x="98" y="152" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif" font-size="16" fill="#9AA0BF">1 句「记一下:……」</text>
+    <text x="98" y="152" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif" font-size="16" font-weight="600" fill="#D5D8F2">1 句「记一下:……」</text>
     <text x="98" y="180" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif" font-size="16" fill="#9AA0BF">或敲 /log-decision</text>
     <text x="98" y="208" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif" font-size="16" fill="#6E7291">2 秒的事,省两小时</text>
   </g>
@@ -37,22 +37,23 @@
     <text x="98" y="80" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif" font-size="20" font-weight="700" fill="#F2F3FA">落盘触发</text>
     <text x="98" y="104" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12" fill="#6E7291">decision_log / 命令</text>
     <line x1="16" y1="120" x2="180" y2="120" stroke="#262A45"/>
-    <text x="98" y="152" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif" font-size="16" fill="#9AA0BF">工具 + 命令双入口</text>
+    <text x="98" y="152" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif" font-size="16" font-weight="600" fill="#D5D8F2">工具 + 命令双入口</text>
     <text x="98" y="180" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif" font-size="16" fill="#9AA0BF">显式调用才落盘</text>
     <text x="98" y="208" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif" font-size="16" fill="#6E7291">不自动乱记</text>
   </g>
 
-  <!-- 节点 3:写入本地 -->
+  <!-- 节点 3:写入本地(手账纸) -->
   <g transform="translate(502 76)">
-    <rect width="196" height="250" rx="14" fill="#151729" stroke="#262A45"/>
-    <circle cx="98" cy="34" r="18" fill="#211D3E" stroke="#6C5CE7"/>
-    <text x="98" y="40" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="15" font-weight="700" fill="#A79BF0">03</text>
-    <text x="98" y="80" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif" font-size="20" font-weight="700" fill="#F2F3FA">写入本地</text>
-    <text x="98" y="104" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12" fill="#6E7291">.dsh/DECISIONS.md</text>
-    <line x1="16" y1="120" x2="180" y2="120" stroke="#262A45"/>
-    <text x="98" y="152" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif" font-size="16" fill="#9AA0BF">纯 MD,任何 AI 可读</text>
-    <text x="98" y="180" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif" font-size="16" fill="#9AA0BF">可 git 提交、可 diff</text>
-    <text x="98" y="208" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif" font-size="16" fill="#6E7291">100% 本地,不上云</text>
+    <rect x="5" y="6" width="196" height="250" rx="14" fill="#000000" opacity="0.18"/>
+    <rect width="196" height="250" rx="14" fill="#F8F2E4" stroke="#C4B48F"/>
+    <circle cx="98" cy="34" r="18" fill="#D64541"/>
+    <text x="98" y="40" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="15" font-weight="700" fill="#FFFFFF">03</text>
+    <text x="98" y="80" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif" font-size="20" font-weight="800" fill="#3A352C">写入本地</text>
+    <text x="98" y="104" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12" font-weight="700" fill="#B8791B">.dsh/DECISIONS.md</text>
+    <line x1="16" y1="120" x2="180" y2="120" stroke="#D8CFB4"/>
+    <text x="98" y="152" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif" font-size="16" font-weight="700" fill="#4A4438">纯 MD,任何 AI 可读</text>
+    <text x="98" y="180" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif" font-size="16" fill="#6B6455">可 git 提交、可 diff</text>
+    <text x="98" y="208" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif" font-size="16" fill="#8A8171">100% 本地,不上云</text>
   </g>
 
   <!-- 节点 4:自动注入 -->
@@ -63,7 +64,7 @@
     <text x="98" y="80" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif" font-size="20" font-weight="700" fill="#F2F3FA">自动注入</text>
     <text x="98" y="104" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12" fill="#6E7291">agent/pre-step</text>
     <line x1="16" y1="120" x2="180" y2="120" stroke="#262A45"/>
-    <text x="98" y="152" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif" font-size="16" fill="#9AA0BF">每轮对话自动读</text>
+    <text x="98" y="152" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif" font-size="16" font-weight="600" fill="#D5D8F2">每轮对话自动读</text>
     <text x="98" y="180" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif" font-size="16" fill="#9AA0BF">只注入最新摘要</text>
     <text x="98" y="208" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif" font-size="16" fill="#6E7291">2000 字符硬上限</text>
   </g>
@@ -76,16 +77,16 @@
     <text x="98" y="80" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif" font-size="20" font-weight="700" fill="#F2F3FA">记忆接力</text>
     <text x="98" y="104" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12" fill="#A79BF0">不重复问 · 不推翻</text>
     <line x1="16" y1="120" x2="180" y2="120" stroke="#3A3D68"/>
-    <text x="98" y="152" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif" font-size="16" fill="#C9CCE6">新对话自带旧决定</text>
+    <text x="98" y="152" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif" font-size="16" font-weight="600" fill="#FFFFFF">新对话自带旧决定</text>
     <text x="98" y="180" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif" font-size="16" fill="#C9CCE6">推翻需先说明理由</text>
     <text x="98" y="208" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, sans-serif" font-size="16" fill="#9AA0BF">换任何 AI 都接着读</text>
   </g>
 
-  <!-- 节点间箭头 -->
-  <line x1="246" y1="196" x2="268" y2="196" stroke="#6C5CE7" stroke-width="2" marker-end="url(#arrow)"/>
-  <line x1="474" y1="196" x2="496" y2="196" stroke="#6C5CE7" stroke-width="2" marker-end="url(#arrow)"/>
-  <line x1="702" y1="196" x2="724" y2="196" stroke="#6C5CE7" stroke-width="2" marker-end="url(#arrow)"/>
-  <line x1="930" y1="196" x2="952" y2="196" stroke="#6C5CE7" stroke-width="2" marker-end="url(#arrow)"/>
+  <!-- 节点间曲线箭头 -->
+  <path d="M 246 196 Q 257 181 268 196" fill="none" stroke="#6C5CE7" stroke-width="2" stroke-linecap="round" marker-end="url(#arrow)"/>
+  <path d="M 474 196 Q 485 181 496 196" fill="none" stroke="#6C5CE7" stroke-width="2" stroke-linecap="round" marker-end="url(#arrow)"/>
+  <path d="M 702 196 Q 713 181 724 196" fill="none" stroke="#6C5CE7" stroke-width="2" stroke-linecap="round" marker-end="url(#arrow)"/>
+  <path d="M 930 196 Q 941 181 952 196" fill="none" stroke="#6C5CE7" stroke-width="2" stroke-linecap="round" marker-end="url(#arrow)"/>
 
   <!-- 回环:每开新对话再注入 -->
   <path d="M 1050 326 L 1050 350 Q 1050 358 1042 358 L 848 358 Q 840 358 840 350 L 840 330" fill="none" stroke="#6C5CE7" stroke-width="2" stroke-dasharray="6 5" marker-end="url(#arrow)"/>
