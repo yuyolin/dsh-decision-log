@@ -52,26 +52,31 @@
 
 ---
 
-## 🚀 安装（一次性，30 秒）
+## 🚀 安装（一句话的事，剩下的交给 AI）
+
+**把下面这段话整个复制，发给你的 dsh AI（或任何 AI 助手），它会自动帮你装好、重启、跑冒烟测试：**
+
+```
+帮我安装 dsh-decision-log 插件：
+1. 运行 dsh plugin --profile web add github:yuyolin/dsh-decision-log
+2. 重启 dsh Web UI（启动命令要带 --patch）
+3. 跑冒烟测试：开一个会话，执行 /log-decision 测试，确认返回"决策已记录"
+4. 把结果告诉我
+```
+
+> 如果你在**本地开发**这个插件，把第 1 步换成：`dsh plugin --profile web add "link:D:/dsh-decision-log"` 即可。
+
+**想自己动手？** 也完全可以，就三条命令：
 
 ```bash
-# 推荐：从 GitHub 安装
+# 1. 安装
 dsh plugin --profile web add github:yuyolin/dsh-decision-log
 
-# 本地开发调试
-dsh plugin --profile web add "link:D:/dsh-decision-log"
-```
-
-装完**重启 Web UI**，启动命令带 `--patch`（不然插件不生效）：
-
-```bash
+# 2. 重启 Web UI（必须带 --patch，否则插件不生效）
 npx @deepseek-ai/dsh web --patch
-```
 
-**确认装好了？** 随便开个对话，输入框打一句：
-
-```
-/log-decision 测试一下
+# 3. 验证：开个会话，输入
+/log-decision 测试
 ```
 
 看到"决策已记录"就说明它活了 ✅（这条测试记录留着或删掉都行）。
