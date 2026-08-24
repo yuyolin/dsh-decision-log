@@ -419,9 +419,17 @@ export async function apply(ctx: Context): Promise<void> {
       const last = lastInjected.get(agent as object)
       if (step !== 1 && last === summary) return decision
       lastInjected.set(agent as object, summary)
+      // 决策摘要注入
+      const messages = [await buildInjectionMessage(ctx, summary)]
+      // 候选提示注入：检测到潜在决策时提醒 AI 询问用户（不自动落盘）
+      const candidates = drainCandidates(cwd)
+      if (candidates.length > 0) {
+        const hint = '检测到潜在决策（自动识别，未记录）：\n' + candidates.map((c) => `- ${c.text}`).join('\n') + '\n如需记录，请询问用户后调用 decision_log；若与已有决策重复或无关，忽略即可。'
+        messages.push(await buildInjectionMessage(ctx, hint))
+      }
       return {
         kind: 'enter',
-        messages: decision.messages.concat([await buildInjectionMessage(ctx, summary)]),
+        messages: decision.messages.concat(messages),
       }
     }, { prepend: true })
   } catch (err) {
