@@ -281,6 +281,13 @@ export async function apply(ctx: Context): Promise<void> {
         messages: decision.messages.concat([{
           role: 'user',
           content: [{ type: 'text', text: summary }],
+          // 官方插件标记：声明这是插件注入的上下文快照，而非真实用户消息
+          source: {
+            kind: 'plugin',
+            plugin: name,
+            form: 'snapshot',
+            sections: [{ name: 'decision-log:summary', text: summary }],
+          },
         }]),
       }
     }, { prepend: true })
