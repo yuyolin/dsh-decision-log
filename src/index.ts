@@ -74,8 +74,50 @@ function cwdOf(exec: { agent?: { session?: { header?: { cwd?: string } } } }): s
   return exec?.agent?.session?.header?.cwd ?? process.cwd()
 }
 
+/** 构建注入消息：官方 createUserMessage 生成稳定 id + 插件来源标记 */
+async function buildInjectionMessage(ctx: Context, text: string): Promise<unknown> {
+  const { createUserMessage } = await import('@deepseek-ai/dsh-llm')
+  return createUserMessage({
+    content: [{ type: 'text', text }],
+    source: { kind: 'plugin', plugin: name, form: 'snapshot', sections: [{ name: 'decision-log:summary', text }] },
+  })
+}
+
+/** 读取决策摘要（含首次自动建空白文件）；无内容返回 '' */
+async function summaryFor(ctx: Context, cwd: string, signal?: AbortSignal): Promise<string> {
+  const log = await loadLog(ctx, cwd, signal)
+  return renderSummary(log, INJECT_MAX_CHARS)
+}
+
+/** 确保工作区已初始化空白 DECISIONS.md（只建一次） */
+async function ensureLogFile(ctx: Context, cwd: string, signal?: AbortSignal): Promise<void> {
+  const log = await loadLog(ctx, cwd, signal)
+  if (log.entries.length === 0) await saveLog(ctx, cwd, log, signal)
+}
+
 export async function apply(ctx: Context): Promise<void> {
   const tools = (ctx as unknown as { tools: { register: (def: unknown) => unknown } }).tools
+
+  // ---------- 服务:ctx.decisionLog（暴露给其他插件/UI 调用，对标 OpenViking ctx.provide） ----------
+  try {
+    const provide = (ctx as any).provide
+    if (typeof provide === 'function') {
+      provide('decisionLog', {
+        /** 查询某工作区的决策 */
+        async list(cwd: string, opts?: { keyword?: string; status?: string; limit?: number }) {
+          return queryLog(await loadLog(ctx, cwd), opts)
+        },
+        /** 追加一条决策，返回新总条数 */
+        async add(cwd: string, entry: DecisionEntry) {
+          const log = appendEntry(await loadLog(ctx, cwd), entry)
+          await saveLog(ctx, cwd, log)
+          return log.entries.length
+        },
+      })
+    }
+  } catch (err) {
+    log('warn', `注册 decisionLog 服务失败:${(err as Error).message}`)
+  }
 
   // ---------- 工具 1:decision_log ----------
   try {
@@ -261,13 +303,9 @@ export async function apply(ctx: Context): Promise<void> {
         // 首次遇到该工作区：确保空白 DECISIONS.md 已创建（给 AI 读的"小本本"）
         if (!ensuredCwd.has(cwd)) {
           ensuredCwd.add(cwd)
-          const log0 = await loadLog(ctx, cwd, signal)
-          if (log0.entries.length === 0) {
-            await saveLog(ctx, cwd, log0, signal)
-          }
+          await ensureLogFile(ctx, cwd, signal)
         }
-        const log = await loadLog(ctx, cwd, signal)
-        summary = renderSummary(log, INJECT_MAX_CHARS)
+        summary = await summaryFor(ctx, cwd, signal)
       } catch {
         return decision
       }
@@ -275,24 +313,33 @@ export async function apply(ctx: Context): Promise<void> {
       const last = lastInjected.get(agent as object)
       if (step !== 1 && last === summary) return decision
       lastInjected.set(agent as object, summary)
-      // 用官方 createUserMessage 构造注入消息：生成稳定 id、归一化、对齐未来消息不变量
-      const { createUserMessage } = await import('@deepseek-ai/dsh-llm')
       return {
         kind: 'enter',
-        messages: decision.messages.concat([createUserMessage({
-          content: [{ type: 'text', text: summary }],
-          // 官方插件标记：声明这是插件注入的上下文快照，而非真实用户消息
-          source: {
-            kind: 'plugin',
-            plugin: name,
-            form: 'snapshot',
-            sections: [{ name: 'decision-log:summary', text: summary }],
-          },
-        })]),
+        messages: decision.messages.concat([await buildInjectionMessage(ctx, summary)]),
       }
     }, { prepend: true })
   } catch (err) {
     log('warn', `注册 agent/pre-step 注入失败:${(err as Error).message}`)
+  }
+
+  // ---------- 钩子:agent/session-start 开局注入决策摘要（对标 OpenViking 同款机制） ----------
+  try {
+    ;(ctx as any).on?.('agent/session-start', async ({ agent }: { agent: { session?: { header?: { cwd?: string } }; status?: string; inject?: (m: unknown) => void } }) => {
+      const cwd = agent?.session?.header?.cwd
+      if (!cwd || agent?.status !== 'idle') return
+      try {
+        await ensureLogFile(ctx, cwd)
+        const summary = await summaryFor(ctx, cwd)
+        if (!summary) return
+        const message = await buildInjectionMessage(ctx, summary)
+        // 空闲时注入开局摘要（不打断进行中的工作）
+        agent.inject?.(message)
+      } catch (err) {
+        log('warn', `session-start 注入失败:${(err as Error).message}`)
+      }
+    })
+  } catch (err) {
+    log('warn', `注册 agent/session-start 失败:${(err as Error).message}`)
   }
 
   // ---------- systemPrompt 引导:教模型在方案选择时主动记决策 ----------
