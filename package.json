@@ -1,7 +1,7 @@
 {
   "name": "dsh-decision-log",
   "description": "Auto-capture key decisions from dsh sessions into a versionable DECISIONS.md and inject them into future sessions",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "license": "MIT",
   "type": "module",
   "main": "lib/index.js",

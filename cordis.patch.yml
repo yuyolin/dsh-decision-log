@@ -3,4 +3,4 @@
 # Inserts the decision-log plugin into the profile's composition.
 - insert:
     - id: dsh-decision-log
-      name: ./lib/index.js
+      name: dsh-decision-log
