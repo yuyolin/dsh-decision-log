@@ -2,3 +2,7 @@ node_modules/
 /lib/
 *.tsbuildinfo
 _full_render.html
+
+node_modules/
+pnpm-workspace.yaml
+lib/

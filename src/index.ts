@@ -26,7 +26,8 @@ import { extractCandidate, type DecisionCandidate } from './lib/candidate.js'
 import { auditLog } from './lib/audit.js'
 
 export const name = 'dsh-decision-log'
-export const inject = ['tools']
+// tools 服务改为可选依赖：硬性 inject 在服务缺失时会让 Cordis 无限期等待，表现为启动卡死
+export const inject: string[] = []
 
 type AnyFn = (...args: any[]) => any
 
@@ -38,6 +39,24 @@ const INJECT_MAX_CHARS = 2000
 function log(fn: 'info' | 'warn', msg: string): void {
   if (fn === 'warn') console.warn(`[decision-log] ${msg}`)
   else console.log(`[decision-log] ${msg}`)
+}
+
+/** 钩子内 IO 的超时上限：超时即放弃本次注入，绝不让 agent 主循环等待 */
+const IO_TIMEOUT_MS = 2000
+
+/**
+ * 给 promise 加超时保护。loadLog 等调用的 catch 只能接住 reject，
+ * 接不住"永不 settle"的 promise（如 fs 服务未就绪时 readText 挂起）；
+ * 该 promise 一旦挡在 agent/pre-step 必经之路上就会挂死整个 agent 循环。
+ */
+function withTimeout<T>(p: Promise<T>, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} 超时(${IO_TIMEOUT_MS}ms)`)), IO_TIMEOUT_MS)
+    p.then(
+      (v) => { clearTimeout(timer); resolve(v) },
+      (e) => { clearTimeout(timer); reject(e) },
+    )
+  })
 }
 
 /** 读取工作区的 DECISIONS.md；不存在返回空 log */
@@ -140,7 +159,13 @@ function drainCandidates(cwd: string): DecisionCandidate[] {
 }
 
 export async function apply(ctx: Context): Promise<void> {
-  const tools = (ctx as unknown as { tools: { register: (def: unknown) => unknown } }).tools
+  // tools 服务可选：缺失时跳过全部工具注册并告警，其余能力（钩子/命令/引导）照常
+  const tools = ((ctx as any).get?.('tools') ?? (ctx as any).tools) as
+    | { register: (def: unknown) => unknown }
+    | undefined
+  if (!tools || typeof tools.register !== 'function') {
+    log('warn', '缺少 tools 服务，工具注册已跳过（决策摘要注入等能力不受影响）')
+  }
 
   // ---------- 服务:ctx.decisionLog（暴露给其他插件/UI 调用，对标 OpenViking ctx.provide） ----------
   try {
@@ -165,7 +190,7 @@ export async function apply(ctx: Context): Promise<void> {
 
   // ---------- 工具 1:decision_log ----------
   try {
-    tools.register((defineTool as unknown as AnyFn)({
+    if (tools) tools.register((defineTool as unknown as AnyFn)({
       name: 'decision_log',
       description:
         '记录一条关键决策：选了什么方案、为什么。决策会追加到工作区 .dsh/DECISIONS.md，后续会话会自动看到，避免重复讨论或被推翻。重要决策（方案选择、技术替换、方向变更）请主动调用。',
@@ -255,7 +280,7 @@ export async function apply(ctx: Context): Promise<void> {
   // ---------- 工具 3:decision_confirm / decision_reject（审批门） ----------
   const registerDecisionVerdict = (toolName: string, status: 'accepted' | 'rejected', verb: string) => {
     try {
-      tools.register((defineTool as unknown as AnyFn)({
+      if (tools) tools.register((defineTool as unknown as AnyFn)({
         name: toolName,
         description: `将一条"待确认"的决策标记为 ${verb}。用 decision_list 或决策摘要找到那条待确认决策，传入其决策内容。`,
         parameters: {
@@ -286,7 +311,7 @@ export async function apply(ctx: Context): Promise<void> {
 
   // ---------- 工具 3:decision_audit ----------
   try {
-    tools.register((defineTool as unknown as AnyFn)({
+    if (tools) tools.register((defineTool as unknown as AnyFn)({
       name: 'decision_list',
       description: '查询工作区已记录的决策。关键词/状态过滤，最新在前。',
       parameters: {
@@ -318,7 +343,7 @@ export async function apply(ctx: Context): Promise<void> {
 
   // ---------- 工具 4:decision_audit ----------
   try {
-    tools.register((defineTool as unknown as AnyFn)({
+    if (tools) tools.register((defineTool as unknown as AnyFn)({
       name: 'decision_audit',
       description: '审计工作区决策日志：查重、状态统计、token 估算。',
       parameters: {},
@@ -341,7 +366,7 @@ export async function apply(ctx: Context): Promise<void> {
 
   // ---------- 工具 5:decision_export ----------
   try {
-    tools.register((defineTool as unknown as AnyFn)({
+    if (tools) tools.register((defineTool as unknown as AnyFn)({
       name: 'decision_export',
       description: '把工作区已记录的决策导出为标准 DECISIONS.md（已自动落盘，此工具用于查看当前内容或强制重建）。',
       parameters: {},
@@ -437,23 +462,31 @@ export async function apply(ctx: Context): Promise<void> {
         // 首次遇到该工作区：确保空白 DECISIONS.md 已创建（给 AI 读的"小本本"）
         if (!ensuredCwd.has(cwd)) {
           ensuredCwd.add(cwd)
-          await ensureLogFile(ctx, cwd, signal)
+          await withTimeout(ensureLogFile(ctx, cwd, signal), 'ensureLogFile')
         }
-        summary = await summaryFor(ctx, cwd, signal)
-      } catch {
+        summary = await withTimeout(summaryFor(ctx, cwd, signal), 'summaryFor')
+      } catch (err) {
+        // 超时/IO 失败：放弃本次注入，绝不阻塞 agent 主循环
+        log('warn', `pre-step 注入跳过:${(err as Error).message}`)
         return decision
       }
       if (!summary) return decision
       const last = lastInjected.get(agent as object)
       if (step !== 1 && last === summary) return decision
       lastInjected.set(agent as object, summary)
-      // 决策摘要注入
-      const messages = [await buildInjectionMessage(ctx, summary)]
-      // 候选提示注入：检测到潜在决策时提醒 AI 询问用户（不自动落盘）
-      const candidates = drainCandidates(cwd)
-      if (candidates.length > 0) {
-        const hint = '检测到潜在决策（自动识别，未记录）：\n' + candidates.map((c) => `- ${c.text}`).join('\n') + '\n如需记录，请询问用户后调用 decision_log；若与已有决策重复或无关，忽略即可。'
-        messages.push(await buildInjectionMessage(ctx, hint))
+      let messages: unknown[]
+      try {
+        // 决策摘要注入
+        messages = [await withTimeout(buildInjectionMessage(ctx, summary), 'inject-summary')]
+        // 候选提示注入：检测到潜在决策时提醒 AI 询问用户（不自动落盘）
+        const candidates = drainCandidates(cwd)
+        if (candidates.length > 0) {
+          const hint = '检测到潜在决策（自动识别，未记录）：\n' + candidates.map((c) => `- ${c.text}`).join('\n') + '\n如需记录，请询问用户后调用 decision_log；若与已有决策重复或无关，忽略即可。'
+          messages.push(await withTimeout(buildInjectionMessage(ctx, hint), 'inject-candidates'))
+        }
+      } catch (err) {
+        log('warn', `pre-step 消息构建跳过:${(err as Error).message}`)
+        return decision
       }
       return {
         kind: 'enter',
@@ -470,10 +503,10 @@ export async function apply(ctx: Context): Promise<void> {
       const cwd = agent?.session?.header?.cwd
       if (!cwd || agent?.status !== 'idle') return
       try {
-        await ensureLogFile(ctx, cwd)
-        const summary = await summaryFor(ctx, cwd)
+        await withTimeout(ensureLogFile(ctx, cwd), 'session-start ensureLogFile')
+        const summary = await withTimeout(summaryFor(ctx, cwd), 'session-start summaryFor')
         if (!summary) return
-        const message = await buildInjectionMessage(ctx, summary)
+        const message = await withTimeout(buildInjectionMessage(ctx, summary), 'session-start inject')
         // 空闲时注入开局摘要（不打断进行中的工作）
         agent.inject?.(message)
       } catch (err) {
